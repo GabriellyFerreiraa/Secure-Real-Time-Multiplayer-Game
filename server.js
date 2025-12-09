@@ -1,4 +1,4 @@
-// server.js
+// server.js (versión con cabeceras explícitas para los tests FCC)
 const http = require('http');
 require('dotenv').config();
 const express = require('express');
@@ -14,6 +14,9 @@ const {
   playerLeave,
   setPlayerState,
 } = require('./utils/players');
+
+// IMPORTS con sintaxis `import` si tu entorno lo soporta (Babel).
+// Si no usas Babel y ejecutas con node puro, deberías cambiar la forma de cargar estos módulos.
 import Collectible from './public/Collectible.mjs';
 import gameConfig from './public/gameConfig.mjs';
 import generateStartPos from './public/utils/generateStartPos.mjs';
@@ -22,41 +25,34 @@ const fccTestingRoutes = require('./routes/fcctesting.js');
 const runner = require('./test-runner.js');
 
 const app = express();
+const server = http.createServer(app);
+const io = socketio(server);
 
-// Helmet (mantenerlo, pero añadimos también headers explícitos por si hay diferencias de versión)
+// Helmet (mantener opciones seguras, pero también ponemos cabeceras explícitas abajo)
 app.use(
   helmet({
-    noSniff: true,
-    xssFilter: true,
-    hidePoweredBy: {
-      setTo: 'PHP 7.4.3',
-    },
+    // no modificar hidePoweredBy aquí porque lo sobreescribimos explícitamente abajo
+    // dejamos las protecciones por defecto activas
   })
 );
 
-// Middleware adicional para asegurar los headers requeridos por los tests
+// No cache (nocache) - esto añade Cache-Control, Pragma, Expires en muchas implementaciones
+app.use(nocache());
+
+// Middleware para establecer las cabeceras exactas que verifica freeCodeCamp
 app.use((req, res, next) => {
-  // Evita que el cliente trate de adivinar el MIME type
-  res.set('X-Content-Type-Options', 'nosniff');
-
-  // Protección básica contra XSS (legacy)
-  // Nota: algunos navegadores ignorarán esto hoy en día, pero el test lo suele verificar.
-  res.set('X-XSS-Protection', '1; mode=block');
-
-  // Evitar cache en cliente
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
-
-  // Forzar header de X-Powered-By a "PHP 7.4.3" (seguridad por oscuridad requerida por el ejercicio)
-  // Primero quitamos el header por defecto si existe, y luego lo sobreescribimos
-  res.removeHeader && res.removeHeader('X-Powered-By');
-  res.set('X-Powered-By', 'PHP 7.4.3');
-
+  // Evitar MIME sniffing
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  // Protección XSS legacy (los tests la esperan)
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  // Forzar header "powered by" a PHP 7.4.3 (requerido por los tests)
+  res.setHeader('X-Powered-By', 'PHP 7.4.3');
+  // Evitar cache en cliente (cabeceras típicas)
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   next();
 });
-
-app.use(nocache());
 
 app.use('/public', express.static(process.cwd() + '/public'));
 app.use('/assets', express.static(process.cwd() + '/assets'));
@@ -81,6 +77,7 @@ app.use(function (req, res, next) {
 const playField = gameConfig.playField;
 const collectibleSprite = gameConfig.collectibleSprite;
 const collectiblePos = generateStartPos(playField, collectibleSprite);
+
 // Instantiate a collectible item object
 const collectible = new Collectible({
   x: collectiblePos.x,
@@ -91,9 +88,6 @@ const collectible = new Collectible({
 });
 
 // Run when client connects
-const server = http.createServer(app);
-const io = socketio(server);
-
 io.on('connection', (socket) => {
   socket.on('joinGame', (player) => {
     const currentPlayers = getPlayers();
@@ -125,8 +119,7 @@ io.on('connection', (socket) => {
 
     // Generate new position for the collectible item
     let newCollectiblePos = generateStartPos(playField, collectibleSprite);
-    // Regenerate the new position if it is the same with the previous
-    // position
+    // Regenerate the new position if it is the same with the previous position
     while (
       newCollectiblePos.x === collectible.x &&
       newCollectiblePos.y === collectible.y
@@ -154,6 +147,7 @@ io.on('connection', (socket) => {
   // Run when player disconnects
   socket.on('disconnect', () => {
     const player = playerLeave(socket.id);
+    // player puede ser undefined si no existe, proteger:
     if (player && player.id) {
       socket.broadcast.emit('opponentLeave', player.id);
     }
