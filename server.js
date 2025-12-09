@@ -1,3 +1,4 @@
+// server.js
 const http = require('http');
 require('dotenv').config();
 const express = require('express');
@@ -21,9 +22,8 @@ const fccTestingRoutes = require('./routes/fcctesting.js');
 const runner = require('./test-runner.js');
 
 const app = express();
-const server = http.createServer(app);
-const io = socketio(server);
 
+// Helmet (mantenerlo, pero añadimos también headers explícitos por si hay diferencias de versión)
 app.use(
   helmet({
     noSniff: true,
@@ -33,6 +33,29 @@ app.use(
     },
   })
 );
+
+// Middleware adicional para asegurar los headers requeridos por los tests
+app.use((req, res, next) => {
+  // Evita que el cliente trate de adivinar el MIME type
+  res.set('X-Content-Type-Options', 'nosniff');
+
+  // Protección básica contra XSS (legacy)
+  // Nota: algunos navegadores ignorarán esto hoy en día, pero el test lo suele verificar.
+  res.set('X-XSS-Protection', '1; mode=block');
+
+  // Evitar cache en cliente
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+
+  // Forzar header de X-Powered-By a "PHP 7.4.3" (seguridad por oscuridad requerida por el ejercicio)
+  // Primero quitamos el header por defecto si existe, y luego lo sobreescribimos
+  res.removeHeader && res.removeHeader('X-Powered-By');
+  res.set('X-Powered-By', 'PHP 7.4.3');
+
+  next();
+});
+
 app.use(nocache());
 
 app.use('/public', express.static(process.cwd() + '/public'));
@@ -68,6 +91,9 @@ const collectible = new Collectible({
 });
 
 // Run when client connects
+const server = http.createServer(app);
+const io = socketio(server);
+
 io.on('connection', (socket) => {
   socket.on('joinGame', (player) => {
     const currentPlayers = getPlayers();
@@ -128,7 +154,9 @@ io.on('connection', (socket) => {
   // Run when player disconnects
   socket.on('disconnect', () => {
     const player = playerLeave(socket.id);
-    socket.broadcast.emit('opponentLeave', player.id);
+    if (player && player.id) {
+      socket.broadcast.emit('opponentLeave', player.id);
+    }
   });
 });
 
