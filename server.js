@@ -11,20 +11,26 @@ const runner = require('./test-runner.js');
 
 const app = express();
 
-// Desactiva el header por defecto de Express y establece PHP 7.4.3
+/* ------------------ BLOQUE DE SEGURIDAD ------------------ */
+
+// Desactiva el header por defecto de Express
 app.disable('x-powered-by');
+
+// Encabezado falso: PHP 7.4.3
 app.use((req, res, next) => {
-  res.set('X-Powered-By', 'PHP 7.4.3');
+  res.setHeader('X-Powered-By', 'PHP 7.4.3');
   next();
 });
 
-// Helmet v3: aplica los middlewares explícitamente según los tests FCC
+// Helmet v3: aplica los middlewares explícitos que los tests esperan
 app.use(helmet.noSniff());    // Test 16: X-Content-Type-Options: nosniff
 app.use(helmet.xssFilter());  // Test 17: X-XSS-Protection
 app.use(helmet.noCache());    // Test 18: Cache-Control / Pragma / Expires
 
 // Evita ETag globalmente (refuerza no-caché)
 app.set('etag', false);
+
+/* --------------------------------------------------------- */
 
 // CORS para pruebas FCC
 app.use(cors({ origin: '*' }));
@@ -122,7 +128,7 @@ io.on('connection', (socket) => {
     socket.emit('bait', bait);
   });
 
-  // optional: handle disconnect, keep tests happy
+  // handle disconnect
   socket.on('disconnect', () => {
     players = players.filter((p) => p.socketId !== socket.id);
     io.emit('player_updates', players);
