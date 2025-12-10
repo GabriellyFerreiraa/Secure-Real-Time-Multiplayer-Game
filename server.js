@@ -6,11 +6,11 @@ const expect = require('chai');
 // 🛑 SOLUCIÓN FINAL (V3): CARGAR CADA FUNCIÓN DE HELMET POR RUTA ABSOLUTA MÁS SIMPLE
 const path = require('path');
 
-// 🛑 ÚLTIMO INTENTO DE CARGA: Probamos sin guiones
-const xssFilter = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'xssfilter'));
-const noSniff = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'nosniff'));
-const noCache = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'nocache'));
-const hidePoweredBy = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'hidepoweredby')); // Ojo: Probamos también sin guion aquí
+// 🛑 ÚLTIMO INTENTO DE CARGA FINAL: Probamos con guiones y extensión .js
+const xssFilter = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'xss-filter.js'));
+const noSniff = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'no-sniff.js'));
+const noCache = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'nocache.js'));
+const hidePoweredBy = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'hide-powered-by.js'));
 // FIN DE LA CARGA DIRECTA DE HELMET
 
 const cors = require('cors');
