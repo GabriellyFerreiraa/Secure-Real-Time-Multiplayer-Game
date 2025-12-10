@@ -11,16 +11,35 @@ const runner = require('./test-runner.js');
 
 const app = express();
 
-app.use(helmet());
-app.use(helmet.noCache());
-app.use(helmet.hidePoweredBy({ setTo: 'PHP 7.4.3' }));
-app.use(cors({origin: '*'})); //For FCC testing purposes only
+// =======================================================
+// 🛡️ CONFIGURACIÓN DE SEGURIDAD (HELMET) - ¡DEBE IR PRIMERO!
+// =======================================================
 
-app.use('/public', express.static(process.cwd() + '/public'));
-app.use('/assets', express.static(process.cwd() + '/assets'));
+// 1. Configuración de seguridad completa para la versión 3.x
+app.use(helmet()); 
+app.use(helmet.xssFilter());   // Test 17: Previene XSS
+app.use(helmet.noSniff());     // Test 16: Previene MIME Type Sniffing
+app.use(helmet.noCache());     // Test 18: Desactiva el caché (helmet.noCache() está bien para la v3)
+app.use(helmet.hidePoweredBy()); // Oculta la cabecera predeterminada (Ej: Express)
+
+// Test 19: La cabecera dice que el sitio es impulsado por "PHP 7.4.3"
+// Esto se hace manualmente después de ocultar el predeterminado
+app.use((req, res, next) => {
+    res.setHeader('X-Powered-By', 'PHP 7.4.3');
+    next();
+});
+
+// -------------------------------------------------------
+
+app.use(cors({origin: '*'})); // For FCC testing purposes only
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// Archivos estáticos (Ahora después de Helmet)
+app.use('/public', express.static(process.cwd() + '/public'));
+app.use('/assets', express.static(process.cwd() + '/assets'));
+
 
 // Index page (static HTML)
 app.route('/')
