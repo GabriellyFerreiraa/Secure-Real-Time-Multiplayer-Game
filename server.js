@@ -2,10 +2,16 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const expect = require('chai');
-// 🛑 ÚLTIMO INTENTO DE CARGA PARA RENDER: Usamos path.join directamente
+
+// 🛑 SOLUCIÓN FINAL: CARGAR CADA FUNCIÓN DE HELMET DIRECTAMENTE POR RUTA
 const path = require('path');
-const helmet = require(path.join(process.cwd(), 'node_modules', 'helmet')); 
-// FIN DE LA CORRECCIÓN DE CARGA
+
+// Requerimos las funciones de seguridad individuales que necesitamos (menos propenso a errores de ruta)
+const xssFilter = require(path.join(process.cwd(), 'node_modules', 'helmet', 'dist', 'middlewares', 'xss-filter')).default;
+const noSniff = require(path.join(process.cwd(), 'node_modules', 'helmet', 'dist', 'middlewares', 'no-sniff')).default;
+const noCache = require(path.join(process.cwd(), 'node_modules', 'helmet', 'dist', 'middlewares', 'nocache')).default;
+const hidePoweredBy = require(path.join(process.cwd(), 'node_modules', 'helmet', 'dist', 'middlewares', 'hide-powered-by')).default;
+// FIN DE LA CARGA DIRECTA DE HELMET
 
 const cors = require('cors');
 const socket = require('socket.io');
@@ -17,18 +23,16 @@ const app = express();
 
 // =======================================================
 // 🛡️ CONFIGURACIÓN DE SEGURIDAD (HELMET) - ¡DEBE IR PRIMERO!
-// Esto resuelve los tests 16, 17, 18 y 19 de FreeCodeCamp.
 // =======================================================
 
-// 1. Configuración de seguridad completa para la versión 3.x
-app.use(helmet()); 
-app.use(helmet.xssFilter());   // Test 17: Previene XSS
-app.use(helmet.noSniff());     // Test 16: Previene MIME Type Sniffing
-app.use(helmet.noCache());     // Test 18: Desactiva el caché
-app.use(helmet.hidePoweredBy()); // Oculta la cabecera predeterminada (Ej: Express)
+// 1. Aplicamos las funciones de seguridad individuales que cargamos directamente
+app.use(xssFilter());   // Test 17: Previene XSS
+app.use(noSniff());     // Test 16: Previene MIME Type Sniffing
+app.use(noCache());     // Test 18: Desactiva el caché
+app.use(hidePoweredBy()); // Oculta la cabecera X-Powered-By
 
 // Test 19: La cabecera dice que el sitio es impulsado por "PHP 7.4.3"
-// Esto se hace manualmente después de ocultar el predeterminado
+// Esto se hace manualmente
 app.use((req, res, next) => {
     res.setHeader('X-Powered-By', 'PHP 7.4.3');
     next();
