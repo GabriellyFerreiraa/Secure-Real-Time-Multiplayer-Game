@@ -1,165 +1,134 @@
-import Player from './Player.mjs';
-import Collectible from './Collectible.mjs';
-import drawUI from './drawUI.mjs';
-import generateStartPos from './utils/generateStartPos.mjs';
-import drawDropShadow from './utils/drawDropShadow.mjs';
-import gameConfig from './gameConfig.mjs';
+//import Player from './Player.mjs';
+//import Collectible from './Collectible.mjs';
+const Player = require('./Player.mjs');
+const Collectible = require('./Collectible.mjs');
 
 const socket = io();
 const canvas = document.getElementById('game-window');
-const ctx = canvas.getContext('2d');
-const canvasWidth = (canvas.width = gameConfig.gameWindowWidth);
-const canvasHeight = (canvas.height = gameConfig.gameWindowHeight);
 
-let player;
-let playerRank = 'Rank:   /  ';
-const currentOpponents = [];
-let currentCollectible;
-let isEmittingCollision = false;
+const CANVAS_WIDTH = 800
+const CANVAS_HEIGHT = 500
 
-// Pre-load sprites
-const loadSprite = (src) => {
-  const sprite = new Image();
-  sprite.src = src;
-  return sprite;
-};
-const playerAvatar = loadSprite(gameConfig.avatar.playerSrc);
-const opponentAvatar = loadSprite(gameConfig.avatar.opponentSrc);
-const collectibleSprites = gameConfig.collectibleSprite.srcs.map((src) => {
-  return loadSprite(src);
-});
+canvas.width = CANVAS_WIDTH
+canvas.height = CANVAS_HEIGHT
 
-// When socket is connected
-socket.on('connect', () => {
-  // ...instantiate a player object
-  const { x, y } = generateStartPos(gameConfig.playField, gameConfig.avatar);
-  player = new Player({ x, y, id: socket.id });
+const context = canvas.getContext('2d');
+let initialColor = getRandomColor()
+context.fillStyle = initialColor
 
-  // ...notify server player joins the game
-  socket.emit('joinGame', player);
-});
+let allPlayers = []
+let cPlayer
+let cBait
 
-// Collectible item from server
-socket.on('collectible', (collectible) => {
-  // If collectible item already exists
-  if (currentCollectible) {
-    // ...update its state
-    currentCollectible.setState(collectible);
-    // Reset the isEmittingCollision to false, so we
-    // can notify server when player collides with the
-    // new collectible item
-    isEmittingCollision = false;
-  }
-  // Otherwise instantiate a new collectible item object
-  else {
-    currentCollectible = new Collectible(collectible);
-  }
-});
+socket.on('connect', function () {
 
-// Player scored
-socket.on('scored', (newScore) => {
-  player.score = newScore;
-  playerRank = player.calculateRank([player, ...currentOpponents]);
-});
+  let playerId = socket.io.engine.id
+  // create a new player
+  cPlayer = new Player({
+    x: Math.floor(Math.random() * CANVAS_WIDTH - 30),
+    y: Math.floor(Math.random() * CANVAS_HEIGHT - 30),
+    score: 0,
+    id: playerId,
+  })
 
-// Get current opponents
-socket.on('currentOpponents', (opponents) => {
-  opponents.forEach((opponent) => {
-    currentOpponents.push(new Player(opponent));
-  });
+  socket.emit("start", cPlayer)
 
-  playerRank = player.calculateRank([player, ...currentOpponents]);
-});
+  socket.on("player_updates", (players) => {
+    allPlayers = players
+    drawPlayers(allPlayers)
+  })
 
-// New opponent joined the game
-socket.on('newOpponent', (opponent) => {
-  currentOpponents.push(new Player(opponent));
-  playerRank = player.calculateRank([player, ...currentOpponents]);
-});
+  socket.on("bait", (bait) => {
+    cBait = bait
+    drawBait(bait.x, bait.y, bait.value)
+  })
 
-// Listen for opponent's state change
-socket.on('opponentStateChange', ({ x, y, score, id, dir }) => {
-  const opponent = currentOpponents.find((opponent) => opponent.id === id);
-  opponent.x = x;
-  opponent.y = y;
-  opponent.score = score;
-  opponent.dir = dir;
-  playerRank = player.calculateRank([player, ...currentOpponents]);
-});
+  window.addEventListener("keydown", (e) => {
+    let cur_key = e.key.toLowerCase()
+    let direction = cur_key === "d" ? "right" :
+      cur_key === "a" ? "left" :
+        cur_key === "w" ? "up" :
+          cur_key === "s" ? "down" : null
 
-// Opponent leaves
-socket.on('opponentLeave', (id) => {
-  const opponentIndex = currentOpponents.findIndex(
-    (opponent) => opponent.id === id
-  );
-  currentOpponents.splice(opponentIndex, 1);
-  playerRank = player.calculateRank([player, ...currentOpponents]);
-});
-
-// User moves his/her avatar
-document.addEventListener('keydown', ({ key }) => {
-  switch (key) {
-    case 'w':
-      player.dir = 'up';
-      break;
-    case 's':
-      player.dir = 'down';
-      break;
-    case 'a':
-      player.dir = 'left';
-      break;
-    case 'd':
-      player.dir = 'right';
-      break;
-    default:
-    // do nothing
-  }
-  socket.emit('playerStateChange', player);
-});
-
-// User stops moving his/her avatar
-document.addEventListener('keyup', ({ key }) => {
-  if (player && (key === 'w' || key === 's' || key === 'a' || key === 'd')) {
-    player.dir = null;
-    socket.emit('playerStateChange', player);
-  }
-});
-
-// Render the game on to canvas
-function renderGame() {
-  ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
-  // Draw game UI
-  drawUI(ctx, playerRank);
-
-  // Draw collectible
-  if (currentCollectible) {
-    currentCollectible.draw(ctx, collectibleSprites);
-  }
-
-  // Draw player's avatar
-  if (player) {
-    player.draw(ctx, playerAvatar);
-  }
-
-  // Draw each opponent's avatar
-  for (const opponent of currentOpponents) {
-    opponent.draw(ctx, opponentAvatar);
-  }
-
-  // Draw drop shadow to all sprites on current canvas
-  drawDropShadow(ctx);
-
-  // Check collision between player's avatar and collectible item
-  if (player && currentCollectible) {
-    // If they collide, notify server once
-    if (player.collision(currentCollectible) && !isEmittingCollision) {
-      socket.emit('playerCollideWithCollectible', player);
-      // We already notified server, so we don't need to notify again
-      isEmittingCollision = true;
+    if (direction) {
+      context.clearRect(...getCoord(cPlayer))
+      cPlayer.movePlayer(direction, 10)
+      checkBoundary(cPlayer)
+      context.fillRect(...getCoord(cPlayer))
+      allPlayers = allPlayers.map(p => {
+        if (p.id === cPlayer.id) {
+          return cPlayer
+        } else {
+          return p
+        }
+      })
+      socket.emit("player_updates", allPlayers)
     }
-  }
 
-  requestAnimationFrame(renderGame);
+    if (cPlayer.collision(cBait)) {
+      context.clearRect(...getBaitCoord(cBait))
+      cBait = { value: 0 }
+      context.fillRect(...getCoord(cPlayer))
+      socket.emit("collision", cPlayer)
+      let rank = cPlayer.calculateRank(allPlayers)
+      document.getElementById("rank").innerText = rank
+    }
+  })
+
+});
+
+// format player(square box) coordinate x, y, width, height
+function getCoord(player) {
+  return [player.x, player.y, 20, 20]
 }
-requestAnimationFrame(renderGame);
+
+// get random colors for player
+function getRandomColor() {
+  let r, g, b
+  r = Math.floor(Math.random() * 256)
+  g = Math.floor(Math.random() * 256)
+  b = Math.floor(Math.random() * 256)
+  return `rgb(${r}, ${g}, ${b})`
+}
+
+// check boundary collision 
+function checkBoundary(player) {
+  if (player.x < 5) {
+    player.x = 5
+  }
+  if (player.x > CANVAS_WIDTH - 25) {
+    player.x = CANVAS_WIDTH - 25
+  }
+  if (player.y < 5) {
+    player.y = 5
+  }
+  if (player.y > CANVAS_HEIGHT - 25) {
+    player.y = CANVAS_HEIGHT - 25
+  }
+}
+
+// draw bait or collectible for player to catch
+function drawBait(x, y, value) {
+  // value 1-5
+  // bait of different colors and size acc. to value
+  let colors = ["#f542cb", "#f55742", "#f5f242", "#428df5", "#42f56c"]
+  context.beginPath()
+  context.arc(x, y, value * 2 + 10, 0, 2 * Math.PI, false)
+  context.fillStyle = colors[value - 1]
+  context.fill()
+}
+
+// format bait coordinate 
+// to clear it from screen
+function getBaitCoord(bait) {
+  let radFactor = bait.value * 2 + 10
+  return [bait.x - radFactor, bait.y - radFactor, bait.x + radFactor, bait.y + radFactor]
+}
+
+// draw all players
+function drawPlayers(players) {
+  for (let p of players) {
+    context.fillRect(...getCoord(p))
+  }
+}
+

@@ -8,11 +8,7 @@ code {
 
 canvas {
   margin: auto;
-  background-color: #222200;
-}
-
-#user-stories {
-  font-size: 1.3rem;
+  border: 10px solid #1e1e1e;
 }
 
 .container {
@@ -24,4 +20,9 @@ canvas {
   .container {
     flex-direction: row;
   }
+}
+
+.control-center {
+  display: flex;
+  justify-content: space-around;
 }
