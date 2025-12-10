@@ -27,8 +27,14 @@ app.use(helmet.noSniff());    // Test 16: X-Content-Type-Options: nosniff
 app.use(helmet.xssFilter());  // Test 17: X-XSS-Protection
 app.use(helmet.noCache());    // Test 18: Cache-Control / Pragma / Expires
 
-// Evita ETag globalmente (refuerza no-caché)
+// Evita ETag globalmente
 app.set('etag', false);
+
+// Middleware global para eliminar cualquier ETag residual
+app.use((req, res, next) => {
+  res.removeHeader('ETag');
+  next();
+});
 
 /* --------------------------------------------------------- */
 
@@ -48,6 +54,7 @@ app.use('/public', express.static(process.cwd() + '/public', {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.setHeader('Surrogate-Control', 'no-store');
+    res.removeHeader('ETag');
   }
 }));
 app.use('/assets', express.static(process.cwd() + '/assets', {
@@ -58,12 +65,19 @@ app.use('/assets', express.static(process.cwd() + '/assets', {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.setHeader('Surrogate-Control', 'no-store');
+    res.removeHeader('ETag');
   }
 }));
 
 // Index page (static HTML)
 app.route('/').get(function (req, res) {
-  res.sendFile(process.cwd() + '/views/index.html');
+  // Refuerza no-cache y elimina ETag en la respuesta principal
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  res.removeHeader('ETag');
+  res.sendFile(process.cwd() + '/views/index.html', { etag: false });
 });
 
 // Rutas de testing FCC
