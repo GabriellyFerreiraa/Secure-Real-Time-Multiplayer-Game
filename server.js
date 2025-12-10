@@ -3,14 +3,12 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const expect = require('chai');
 
-// 🛑 SOLUCIÓN FINAL: CARGAR CADA FUNCIÓN DE HELMET POR RUTA ABSOLUTA MÁS SIMPLE
+// 🛑 SOLUCIÓN FINAL (V3): CARGAR CADA FUNCIÓN DE HELMET POR RUTA ABSOLUTA MÁS SIMPLE
 const path = require('path');
 
-// Intentamos la ruta que evita 'dist/' y quitamos '.default' ya que no siempre se usa en CJS/Node 16
-// La versión 3.x de Helmet puede usar el nombre del archivo sin el guion, o el guion.
-// Probaremos la ruta más común para el middleware de CJS.
-const xssFilter = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'xssfilter'));
-const noSniff = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'nosniff'));
+// Intentamos la ruta con guiones, que es más común en CJS.
+const xssFilter = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'xss-filter'));
+const noSniff = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'no-sniff'));
 const noCache = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'nocache'));
 const hidePoweredBy = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'hide-powered-by'));
 // FIN DE LA CARGA DIRECTA DE HELMET
