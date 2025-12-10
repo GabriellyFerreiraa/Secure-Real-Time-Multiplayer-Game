@@ -3,15 +3,9 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const expect = require('chai');
 
-// 🛑 SOLUCIÓN FINAL (V3): CARGAR CADA FUNCIÓN DE HELMET POR RUTA ABSOLUTA MÁS SIMPLE
-const path = require('path');
-
-// 🛑 ÚLTIMO INTENTO DE CARGA FINAL: Probamos con guiones y extensión .js
-const xssFilter = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'xss-filter.js'));
-const noSniff = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'no-sniff.js'));
-const noCache = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'nocache.js'));
-const hidePoweredBy = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'hide-powered-by.js'));
-// FIN DE LA CARGA DIRECTA DE HELMET
+// 🛑 VOLVER A LA FORMA ESTÁNDAR
+const helmet = require('helmet');
+const path = require('path'); // Aunque ya no lo usamos para helmet, es necesario para estáticos
 
 const cors = require('cors');
 const socket = require('socket.io');
@@ -25,11 +19,11 @@ const app = express();
 // 🛡️ CONFIGURACIÓN DE SEGURIDAD (HELMET) - ¡DEBE IR PRIMERO!
 // =======================================================
 
-// 1. Aplicamos las funciones de seguridad individuales que cargamos directamente
-app.use(xssFilter());   // Test 17: Previene XSS
-app.use(noSniff());     // Test 16: Previene MIME Type Sniffing
-app.use(noCache());     // Test 18: Desactiva el caché
-app.use(hidePoweredBy()); // Oculta la cabecera X-Powered-By
+// 1. Aplicamos las funciones de seguridad a través del módulo 'helmet'
+app.use(helmet.xssFilter());   // Test 17: Previene XSS
+app.use(helmet.noSniff());     // Test 16: Previene MIME Type Sniffing
+app.use(helmet.noCache());     // Test 18: Desactiva el caché
+app.use(helmet.hidePoweredBy()); // Oculta la cabecera X-Powered-By
 
 // Test 19: La cabecera dice que el sitio es impulsado por "PHP 7.4.3"
 app.use((req, res, next) => {
@@ -44,7 +38,7 @@ app.use(cors({origin: '*'})); // For FCC testing purposes only
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Archivos estáticos (¡DEBEN ir después de Helmet!)
+// Archivos estáticos
 app.use('/public', express.static(process.cwd() + '/public'));
 app.use('/assets', express.static(process.cwd() + '/assets'));
 
