@@ -6,11 +6,11 @@ const expect = require('chai');
 // 🛑 SOLUCIÓN FINAL (V3): CARGAR CADA FUNCIÓN DE HELMET POR RUTA ABSOLUTA MÁS SIMPLE
 const path = require('path');
 
-// Intentamos la ruta con guiones, que es más común en CJS.
-const xssFilter = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'xss-filter'));
-const noSniff = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'no-sniff'));
+// 🛑 ÚLTIMO INTENTO DE CARGA: Probamos sin guiones
+const xssFilter = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'xssfilter'));
+const noSniff = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'nosniff'));
 const noCache = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'nocache'));
-const hidePoweredBy = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'hide-powered-by'));
+const hidePoweredBy = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'hidepoweredby')); // Ojo: Probamos también sin guion aquí
 // FIN DE LA CARGA DIRECTA DE HELMET
 
 const cors = require('cors');
