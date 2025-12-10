@@ -1,134 +1,144 @@
-//import Player from './Player.mjs';
-//import Collectible from './Collectible.mjs';
-const Player = require('./Player.mjs');
-const Collectible = require('./Collectible.mjs');
+import Player from './Player.mjs';
+import Collectible from './Collectible.mjs';
+import controls from './controls.mjs';
+import { generateStartPos, canvasCalcs } from './canvas-data.mjs';
 
 const socket = io();
 const canvas = document.getElementById('game-window');
+const context = canvas.getContext('2d', { alpha: false });
 
-const CANVAS_WIDTH = 800
-const CANVAS_HEIGHT = 500
+// Preload game assets
+const loadImage = src => {
+  const img = new Image();
+  img.src = src;
+  return img;
+}
 
-canvas.width = CANVAS_WIDTH
-canvas.height = CANVAS_HEIGHT
+const bronzeCoinArt = loadImage('https://cdn.glitch.com/8665ff45-24df-4ac2-a24f-556f4b38fe8b%2Fbronze-coin.png?v=1583918599089');
+const silverCoinArt = loadImage('https://cdn.glitch.com/8665ff45-24df-4ac2-a24f-556f4b38fe8b%2Fsilver-coin.png?v=1583918634034');
+const goldCoinArt = loadImage('https://cdn.glitch.com/8665ff45-24df-4ac2-a24f-556f4b38fe8b%2Fgold-coin.png?v=1583918623913');
+const mainPlayerArt = loadImage('https://cdn.glitch.com/8665ff45-24df-4ac2-a24f-556f4b38fe8b%2Fmain-player.png?v=1583918628079');
+const otherPlayerArt = loadImage('https://cdn.glitch.com/8665ff45-24df-4ac2-a24f-556f4b38fe8b%2Fother-player.png?v=1583918631312');
 
-const context = canvas.getContext('2d');
-let initialColor = getRandomColor()
-context.fillStyle = initialColor
+let tick;
+let currPlayers = [];
+let item;
+let endGame;
 
-let allPlayers = []
-let cPlayer
-let cBait
+socket.on('init', ({ id, players, coin }) => {
+  console.log(`Connected ${id}`);
 
-socket.on('connect', function () {
+  // Cancel animation if one already exists and
+  // the page isn't refreshed, like if the server
+  // restarts
+  cancelAnimationFrame(tick);
 
-  let playerId = socket.io.engine.id
-  // create a new player
-  cPlayer = new Player({
-    x: Math.floor(Math.random() * CANVAS_WIDTH - 30),
-    y: Math.floor(Math.random() * CANVAS_HEIGHT - 30),
-    score: 0,
-    id: playerId,
-  })
+  // Create our player when we log on
+  const mainPlayer = new Player({ 
+    x: generateStartPos(canvasCalcs.playFieldMinX, canvasCalcs.playFieldMaxX, 5),
+    y: generateStartPos(canvasCalcs.playFieldMinY, canvasCalcs.playFieldMaxY, 5),
+    id, 
+    main: true 
+  });
 
-  socket.emit("start", cPlayer)
+  controls(mainPlayer, socket);
 
-  socket.on("player_updates", (players) => {
-    allPlayers = players
-    drawPlayers(allPlayers)
-  })
+  // Send our player back to the server
+  socket.emit('new-player', mainPlayer);
 
-  socket.on("bait", (bait) => {
-    cBait = bait
-    drawBait(bait.x, bait.y, bait.value)
-  })
+  // Add new player when someone logs on
+  socket.on('new-player', obj => {
+    // Check that player doesn't already exist
+    const playerIds = currPlayers.map(player => player.id);
+    if (!playerIds.includes(obj.id)) currPlayers.push(new Player(obj));
+  });
 
-  window.addEventListener("keydown", (e) => {
-    let cur_key = e.key.toLowerCase()
-    let direction = cur_key === "d" ? "right" :
-      cur_key === "a" ? "left" :
-        cur_key === "w" ? "up" :
-          cur_key === "s" ? "down" : null
+  // Handle movement
+  socket.on('move-player', ({ id, dir, posObj }) => {
+    const movingPlayer = currPlayers.find(obj => obj.id === id);
+    movingPlayer.moveDir(dir);
+    
+    // Force sync in case of lag
+    movingPlayer.x = posObj.x;
+    movingPlayer.y = posObj.y;
+  });
 
-    if (direction) {
-      context.clearRect(...getCoord(cPlayer))
-      cPlayer.movePlayer(direction, 10)
-      checkBoundary(cPlayer)
-      context.fillRect(...getCoord(cPlayer))
-      allPlayers = allPlayers.map(p => {
-        if (p.id === cPlayer.id) {
-          return cPlayer
-        } else {
-          return p
-        }
-      })
-      socket.emit("player_updates", allPlayers)
-    }
+  socket.on('stop-player', ({ id, dir, posObj }) => {
+    const stoppingPlayer = currPlayers.find(obj => obj.id === id);
+    stoppingPlayer.stopDir(dir);
 
-    if (cPlayer.collision(cBait)) {
-      context.clearRect(...getBaitCoord(cBait))
-      cBait = { value: 0 }
-      context.fillRect(...getCoord(cPlayer))
-      socket.emit("collision", cPlayer)
-      let rank = cPlayer.calculateRank(allPlayers)
-      document.getElementById("rank").innerText = rank
-    }
-  })
+    // Force sync in case of lag
+    stoppingPlayer.x = posObj.x;
+    stoppingPlayer.y = posObj.y;
+  });
 
+  // Handle new coin gen
+  socket.on('new-coin', newCoin => {
+    item = new Collectible(newCoin);
+  });
+
+  // Handle player disconnection
+  socket.on('remove-player', id => {
+    console.log(`${id} disconnected`);
+    currPlayers = currPlayers.filter(player => player.id !== id);
+  });
+
+  // Handle endGame state
+  socket.on('end-game', result => endGame = result);
+
+  // Update scoring player's score
+  socket.on('update-player', playerObj => {
+    const scoringPlayer = currPlayers.find(obj => obj.id === playerObj.id);
+    scoringPlayer.score = playerObj.score;
+  });
+
+  // Populate list of connected players and 
+  // create current coin when logging in
+  currPlayers = players.map(val => new Player(val)).concat(mainPlayer);
+  item = new Collectible(coin);
+
+  draw();
 });
 
-// format player(square box) coordinate x, y, width, height
-function getCoord(player) {
-  return [player.x, player.y, 20, 20]
-}
+const draw = () => {
+  context.clearRect(0, 0, canvas.width, canvas.height);
 
-// get random colors for player
-function getRandomColor() {
-  let r, g, b
-  r = Math.floor(Math.random() * 256)
-  g = Math.floor(Math.random() * 256)
-  b = Math.floor(Math.random() * 256)
-  return `rgb(${r}, ${g}, ${b})`
-}
+  // Set background color
+  context.fillStyle = '#220';
+  context.fillRect(0, 0, canvas.width, canvas.height);
 
-// check boundary collision 
-function checkBoundary(player) {
-  if (player.x < 5) {
-    player.x = 5
+  // Create border for play field
+  context.strokeStyle = 'white';
+  context.strokeRect(canvasCalcs.playFieldMinX, canvasCalcs.playFieldMinY, canvasCalcs.playFieldWidth, canvasCalcs.playFieldHeight);
+
+  // Controls text
+  context.fillStyle = 'white';
+  context.font = `13px 'Press Start 2P'`;
+  context.textAlign = 'center';
+  context.fillText('Controls: WASD', 100, 32.5);
+
+  // Game title
+  context.font = `16px 'Press Start 2P'`;
+  context.fillText('Coin Race', canvasCalcs.canvasWidth / 2, 32.5);
+
+  // Calculate score and draw players each frame
+  currPlayers.forEach(player => {
+    player.draw(context, item, { mainPlayerArt, otherPlayerArt }, currPlayers);
+  });
+
+  // Draw current coin
+  item.draw(context, { bronzeCoinArt, silverCoinArt, goldCoinArt });
+
+  // Remove destroyed coin
+  if (item.destroyed) {
+    socket.emit('destroy-item', { playerId: item.destroyed, coinValue: item.value, coinId: item.id });
   }
-  if (player.x > CANVAS_WIDTH - 25) {
-    player.x = CANVAS_WIDTH - 25
-  }
-  if (player.y < 5) {
-    player.y = 5
-  }
-  if (player.y > CANVAS_HEIGHT - 25) {
-    player.y = CANVAS_HEIGHT - 25
-  }
-}
 
-// draw bait or collectible for player to catch
-function drawBait(x, y, value) {
-  // value 1-5
-  // bait of different colors and size acc. to value
-  let colors = ["#f542cb", "#f55742", "#f5f242", "#428df5", "#42f56c"]
-  context.beginPath()
-  context.arc(x, y, value * 2 + 10, 0, 2 * Math.PI, false)
-  context.fillStyle = colors[value - 1]
-  context.fill()
-}
-
-// format bait coordinate 
-// to clear it from screen
-function getBaitCoord(bait) {
-  let radFactor = bait.value * 2 + 10
-  return [bait.x - radFactor, bait.y - radFactor, bait.x + radFactor, bait.y + radFactor]
-}
-
-// draw all players
-function drawPlayers(players) {
-  for (let p of players) {
-    context.fillRect(...getCoord(p))
+  if (endGame) {
+    context.fillStyle = 'white';
+    context.font = `13px 'Press Start 2P'`
+    context.fillText(`You ${endGame}! Restart and try again.`, canvasCalcs.canvasWidth / 2, 80);
   }
-}
 
+  if (!endGame) tick = requestAnimationFrame(draw);
+}
