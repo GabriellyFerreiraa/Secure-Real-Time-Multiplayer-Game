@@ -11,35 +11,17 @@ const runner = require('./test-runner.js');
 
 const app = express();
 
-/* ------------------ BLOQUE DE SEGURIDAD ------------------ */
-
-// Desactiva el header por defecto de Express
-app.disable('x-powered-by');
-
-// Encabezado falso: PHP 7.4.3
-app.use((req, res, next) => {
-  res.setHeader('X-Powered-By', 'PHP 7.4.3');
-  next();
-});
-
-// Helmet v3: aplica los middlewares explícitos que los tests esperan
-app.use(helmet.noSniff());    // Test 16: X-Content-Type-Options: nosniff
-app.use(helmet.xssFilter());  // Test 17: X-XSS-Protection
-app.use(helmet.noCache());    // Test 18: Cache-Control / Pragma / Expires
-
-// Evita ETag globalmente
-app.set('etag', false);
-
-// Middleware global para eliminar cualquier ETag residual
-app.use((req, res, next) => {
-  res.removeHeader('ETag');
-  next();
-});
-
-/* --------------------------------------------------------- */
-
 // CORS para pruebas FCC
 app.use(cors({ origin: '*' }));
+
+/* ------------------ BLOQUE DE SEGURIDAD ------------------ */
+// Usar los middlewares de Helmet para pasar los tests de seguridad
+app.use(helmet.noSniff());      // Test 16: X-Content-Type-Options: nosniff
+app.use(helmet.xssFilter());    // Test 17: X-XSS-Protection
+app.use(helmet.noCache());      // Test 18: Cache-Control / Pragma / Expires
+app.use(helmet.hidePoweredBy({ setTo: 'PHP 7.4.3' })); // Test 19: X-Powered-By
+/* --------------------------------------------------------- */
+
 
 // Body parsers
 app.use(bodyParser.json());
@@ -47,37 +29,13 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Servir estáticos SIN caché
 app.use('/public', express.static(process.cwd() + '/public', {
-  etag: false,
-  maxAge: 0,
-  setHeaders: (res) => {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Surrogate-Control', 'no-store');
-    res.removeHeader('ETag');
-  }
 }));
 app.use('/assets', express.static(process.cwd() + '/assets', {
-  etag: false,
-  maxAge: 0,
-  setHeaders: (res) => {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Surrogate-Control', 'no-store');
-    res.removeHeader('ETag');
-  }
 }));
 
 // Index page (static HTML)
 app.route('/').get(function (req, res) {
-  // Refuerza no-cache y elimina ETag en la respuesta principal
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.setHeader('Surrogate-Control', 'no-store');
-  res.removeHeader('ETag');
-  res.sendFile(process.cwd() + '/views/index.html', { etag: false });
+  res.sendFile(process.cwd() + '/views/index.html');
 });
 
 // Rutas de testing FCC
