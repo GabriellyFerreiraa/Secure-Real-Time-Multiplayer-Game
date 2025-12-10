@@ -2,10 +2,9 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const expect = require('chai');
-// 🛑 CORRECCIÓN CLAVE PARA RENDER: Usamos 'path' y 'require.resolve' para forzar la carga de helmet
+// 🛑 ÚLTIMO INTENTO DE CARGA PARA RENDER: Usamos path.join directamente
 const path = require('path');
-const helmetPath = path.dirname(require.resolve('helmet/package.json'));
-const helmet = require(helmetPath); 
+const helmet = require(path.join(process.cwd(), 'node_modules', 'helmet')); 
 // FIN DE LA CORRECCIÓN DE CARGA
 
 const cors = require('cors');
