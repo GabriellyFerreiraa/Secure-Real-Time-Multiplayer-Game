@@ -17,23 +17,18 @@ app.use('/assets', express.static(process.cwd() + '/assets'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-app.disable("x-powered-by")
-
 //For FCC testing purposes and enables user to connect from outside the hosting platform
 app.use(cors({ origin: '*' }));
 
-
-// helmet 
-app.use(helmet.xssFilter())
-app.use(helmet.noSniff())
-app.use(helmet.noCache())
-
-// custom header
-function customHeader(req, res, next) {
-  res.setHeader("X-Powered-By", "PHP 7.4.3")
-  next()
-}
-app.use(customHeader)
+// Helmet security configuration for freeCodeCamp tests (helmet@3.21.3)
+app.use(helmet({
+  noCache: true, // Test 18: Nothing from the website is cached in the client.
+  hidePoweredBy: {
+    setTo: "PHP 7.4.3" // Test 19: The headers say that the site is powered by "PHP 7.4.3"
+  },
+  xssFilter: true, // Test 17: Prevent cross-site scripting (XSS) attacks.
+  noSniff: true, // Test 16: Prevent the client from trying to guess / sniff the MIME type.
+}));
 
 // Index page (static HTML)
 app.route('/')
