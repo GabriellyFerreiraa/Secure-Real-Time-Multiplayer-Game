@@ -3,14 +3,16 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const expect = require('chai');
 
-// 🛑 SOLUCIÓN FINAL: CARGAR CADA FUNCIÓN DE HELMET DIRECTAMENTE POR RUTA
+// 🛑 SOLUCIÓN FINAL: CARGAR CADA FUNCIÓN DE HELMET POR RUTA ABSOLUTA MÁS SIMPLE
 const path = require('path');
 
-// Requerimos las funciones de seguridad individuales que necesitamos (menos propenso a errores de ruta)
-const xssFilter = require(path.join(process.cwd(), 'node_modules', 'helmet', 'dist', 'middlewares', 'xss-filter')).default;
-const noSniff = require(path.join(process.cwd(), 'node_modules', 'helmet', 'dist', 'middlewares', 'no-sniff')).default;
-const noCache = require(path.join(process.cwd(), 'node_modules', 'helmet', 'dist', 'middlewares', 'nocache')).default;
-const hidePoweredBy = require(path.join(process.cwd(), 'node_modules', 'helmet', 'dist', 'middlewares', 'hide-powered-by')).default;
+// Intentamos la ruta que evita 'dist/' y quitamos '.default' ya que no siempre se usa en CJS/Node 16
+// La versión 3.x de Helmet puede usar el nombre del archivo sin el guion, o el guion.
+// Probaremos la ruta más común para el middleware de CJS.
+const xssFilter = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'xssfilter'));
+const noSniff = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'nosniff'));
+const noCache = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'nocache'));
+const hidePoweredBy = require(path.join(process.cwd(), 'node_modules', 'helmet', 'middlewares', 'hide-powered-by'));
 // FIN DE LA CARGA DIRECTA DE HELMET
 
 const cors = require('cors');
@@ -32,7 +34,6 @@ app.use(noCache());     // Test 18: Desactiva el caché
 app.use(hidePoweredBy()); // Oculta la cabecera X-Powered-By
 
 // Test 19: La cabecera dice que el sitio es impulsado por "PHP 7.4.3"
-// Esto se hace manualmente
 app.use((req, res, next) => {
     res.setHeader('X-Powered-By', 'PHP 7.4.3');
     next();
